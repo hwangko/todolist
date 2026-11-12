@@ -58,6 +58,7 @@
   .chk.disabled input { cursor: not-allowed; }
   .datebox { display: inline-flex; align-items: center; gap: 6px; font-weight: bold; }
   .datebox input { width: auto; padding: 6px 8px; font-size: .95rem; }
+  .ptime { font-size: .9rem; font-weight: bold; color: var(--blue); background: #eaf2ff; border-radius: 999px; padding: 4px 10px; }
   .spacer { flex: 1; }
   .empty { text-align: center; color: #999; padding: 26px 0 6px; }
   .saved { font-size: .85rem; color: var(--green); text-align: right; height: 1.1em; }
@@ -119,7 +120,7 @@ import {
   getAuth, onAuthStateChanged, createUserWithEmailAndPassword,
   signInWithEmailAndPassword, signOut
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getFirestore, doc, getDoc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 /* ▼▼▼ word-kingdom 프로젝트의 Firebase 설정값을 여기에 붙여넣으세요 ▼▼▼ */
 const firebaseConfig = {
@@ -223,6 +224,20 @@ async function save() {
   }
 }
 
+/* ---------- 서버 시간 (기기 시계를 바꿔도 속일 수 없게) ---------- */
+async function getServerTime() {
+  const ref = doc(db, COLLECTION, uid);
+  await setDoc(ref, { stamp: serverTimestamp() }, { merge: true });
+  const snap = await getDoc(ref);
+  const st = snap.data().stamp;
+  return st && st.toMillis ? st.toMillis() : Date.now();
+}
+function fmtTime(ms) {
+  const d = new Date(ms);
+  const p = (n) => String(n).padStart(2, "0");
+  return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate()) + " " + p(d.getHours()) + ":" + p(d.getMinutes());
+}
+
 /* ---------- 화면 ---------- */
 onAuthStateChanged(auth, async (user) => {
   if (!user) {
@@ -278,15 +293,16 @@ function render() {
     <div class="item ${it.done ? "done" : ""}" data-id="${it.id}">
       <div class="title">${esc(it.text)}</div>
       <div class="controls">
-        <label class="chk">
-          <input type="checkbox" data-act="done" ${it.done ? "checked" : ""}> 실천했어요
+        <label class="chk ${it.parent ? "disabled" : ""}">
+          <input type="checkbox" data-act="done" ${it.done ? "checked" : ""} ${it.parent ? "disabled" : ""}> 실천했어요
         </label>
-        <label class="chk parent ${it.done ? "" : "disabled"}">
-          <input type="checkbox" data-act="parent" ${it.parent ? "checked" : ""} ${it.done ? "" : "disabled"}> 부모님 확인함
+        <label class="chk parent ${(it.done && !it.parent) ? "" : "disabled"}">
+          <input type="checkbox" data-act="parent" ${it.parent ? "checked" : ""} ${(it.done && !it.parent) ? "" : "disabled"}> 부모님 확인함
         </label>
+        ${it.parent ? `<span class="ptime">🔒 ${it.parentAt ? fmtTime(it.parentAt) : "시간 기록 없음"}</span>` : ""}
         <span class="spacer"></span>
         <span class="datebox">📅 실천 날짜
-          <input type="date" data-act="date" value="${it.date}" ${it.done ? "" : "disabled"}>
+          <input type="date" data-act="date" value="${it.date}" ${(it.done && !it.parent) ? "" : "disabled"}>
         </span>
         <button class="del small" data-act="del">삭제</button>
       </div>
@@ -303,14 +319,29 @@ function onItemsEvent(e) {
   const act = el.dataset.act;
 
   if (act === "done" && e.type === "change") {
+    if (item.parent) { render(); return; }
     item.done = el.checked;
     if (item.done) { item.date = item.date || today(); }
-    else { item.date = ""; item.parent = false; }
+    else { item.date = ""; }
     save(); render();
   } else if (act === "parent" && e.type === "change") {
-    item.parent = el.checked;
-    save(); render();
+    if (item.parent || !item.done) { render(); return; }
+    if (!confirm("부모님이 확인하셨나요?\n\n한 번 체크하면 취소할 수 없고, 확인한 시간이 기록돼요.\n\n" + item.text)) {
+      render(); return;
+    }
+    el.disabled = true;
+    getServerTime().then((ms) => {
+      item.parent = true;
+      item.parentAt = ms;
+      return save();
+    }).then(render).catch(() => {
+      const s = $("saveState");
+      s.className = "saved err";
+      s.textContent = "저장 실패! 인터넷을 확인하고 다시 눌러 주세요.";
+      render();
+    });
   } else if (act === "date" && e.type === "change") {
+    if (item.parent) { render(); return; }
     item.date = el.value;
     save();
   } else if (act === "del" && e.type === "click") {
