@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>나의 실천 목록</title>
+<style>
+  :root {
+    --bg: #fff8e7; --card: #ffffff; --main: #ff8a3d; --main-dark: #e5701f;
+    --green: #3fae5a; --blue: #3b82f6; --text: #3a3a3a; --line: #f0e3c8;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: "Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+    background: var(--bg); color: var(--text); min-height: 100vh;
+  }
+  .wrap { max-width: 760px; margin: 0 auto; padding: 20px 14px 60px; }
+  h1 { text-align: center; color: var(--main-dark); margin: 10px 0 20px; font-size: 1.8rem; }
+  .card { background: var(--card); border-radius: 18px; padding: 22px; box-shadow: 0 4px 14px rgba(0,0,0,.08); margin-bottom: 16px; }
+  label { display: block; font-weight: bold; margin: 12px 0 6px; }
+  input[type=text], input[type=password], input[type=date] {
+    width: 100%; padding: 12px 14px; font-size: 1.05rem;
+    border: 2px solid var(--line); border-radius: 12px; font-family: inherit;
+  }
+  input:focus { outline: none; border-color: var(--main); }
+  button {
+    font-family: inherit; font-size: 1.05rem; border: none; border-radius: 12px;
+    padding: 12px 18px; cursor: pointer; background: var(--main); color: #fff; font-weight: bold;
+  }
+  button:hover { background: var(--main-dark); }
+  button:disabled { opacity: .5; cursor: wait; }
+  button.ghost { background: #eee; color: #555; }
+  button.ghost:hover { background: #ddd; }
+  button.small { padding: 6px 10px; font-size: .9rem; }
+  button.del { background: #f3f3f3; color: #c0392b; }
+  button.del:hover { background: #fde4e1; }
+  .btnrow { display: flex; gap: 10px; margin-top: 18px; }
+  .btnrow button { flex: 1; }
+  .msg { margin-top: 12px; min-height: 1.2em; font-weight: bold; color: #c0392b; text-align: center; }
+  .msg.ok { color: var(--green); }
+  .hint { font-size: .9rem; color: #888; margin-top: 8px; line-height: 1.5; }
+  .topbar { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+  .topbar .hello { font-size: 1.2rem; font-weight: bold; }
+  .addrow { display: flex; gap: 8px; }
+  .addrow input { flex: 1; }
+  .summary { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+  .pill { background: #fff3d6; border-radius: 999px; padding: 6px 14px; font-weight: bold; font-size: .95rem; }
+  .item { display: grid; gap: 10px; padding: 14px; border: 2px solid var(--line); border-radius: 14px; margin-top: 12px; background: #fffdf7; }
+  .item.done { background: #f1fbf3; border-color: #bfe6c8; }
+  .item .title { font-size: 1.15rem; font-weight: bold; word-break: break-all; }
+  .item.done .title { color: #2f8a46; }
+  .controls { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px; }
+  .chk { display: inline-flex; align-items: center; gap: 8px; font-weight: bold; margin: 0; cursor: pointer; user-select: none; }
+  .chk input { width: 24px; height: 24px; accent-color: var(--green); cursor: pointer; }
+  .chk.parent input { accent-color: var(--blue); }
+  .chk.disabled { opacity: .45; cursor: not-allowed; }
+  .chk.disabled input { cursor: not-allowed; }
+  .datebox { display: inline-flex; align-items: center; gap: 6px; font-weight: bold; }
+  .datebox input { width: auto; padding: 6px 8px; font-size: .95rem; }
+  .spacer { flex: 1; }
+  .empty { text-align: center; color: #999; padding: 26px 0 6px; }
+  .saved { font-size: .85rem; color: var(--green); text-align: right; height: 1.1em; }
+  .saved.err { color: #c0392b; }
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>📝 나의 실천 목록</h1>
+
+  <!-- 로그인 화면 -->
+  <section id="loginView" class="card">
+    <label for="nameInput">내 이름</label>
+    <input id="nameInput" type="text" maxlength="12" placeholder="예) 홍길동" autocomplete="off">
+    <label for="pwInput">비밀번호 (6글자 이상)</label>
+    <input id="pwInput" type="password" maxlength="30" placeholder="기억하기 쉬운 숫자나 글자" autocomplete="off">
+    <div class="btnrow">
+      <button id="loginBtn">들어가기</button>
+      <button id="signupBtn" class="ghost">처음 시작하기</button>
+    </div>
+    <div id="loginMsg" class="msg"></div>
+    <p class="hint">
+      처음이면 <b>처음 시작하기</b>를, 이미 만들었으면 <b>들어가기</b>를 눌러요.<br>
+      같은 이름·비밀번호로 들어오면 어느 기기에서든 내 목록이 보여요.<br>
+      ※ 비밀번호를 잊어버리면 선생님께 말씀드려요.
+    </p>
+  </section>
+
+  <!-- 목록 화면 -->
+  <section id="listView" class="hidden">
+    <div class="card">
+      <div class="topbar">
+        <div class="hello"><span id="userName"></span> 친구, 안녕! 👋</div>
+        <button id="logoutBtn" class="ghost small">나가기</button>
+      </div>
+      <div class="summary">
+        <span class="pill" id="sumTotal"></span>
+        <span class="pill" id="sumDone"></span>
+        <span class="pill" id="sumParent"></span>
+      </div>
+    </div>
+
+    <div class="card">
+      <label for="newItem" style="margin-top:0">실천할 일 추가하기</label>
+      <div class="addrow">
+        <input id="newItem" type="text" maxlength="60" placeholder="예) 책 20분 읽기" autocomplete="off">
+        <button id="addBtn">추가</button>
+      </div>
+      <div id="saveState" class="saved"></div>
+      <div id="items"></div>
+    </div>
+  </section>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {
+  getAuth, onAuthStateChanged, createUserWithEmailAndPassword,
+  signInWithEmailAndPassword, signOut
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+/* ▼▼▼ word-kingdom 프로젝트의 Firebase 설정값을 여기에 붙여넣으세요 ▼▼▼ */
+const firebaseConfig = {
+  apiKey: "여기에_apiKey",
+  authDomain: "여기에_authDomain",
+  projectId: "여기에_projectId",
+  storageBucket: "여기에_storageBucket",
+  messagingSenderId: "여기에_messagingSenderId",
+  appId: "여기에_appId"
+};
+/* ▲▲▲ 설정값 끝 ▲▲▲ */
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+const COLLECTION = "todoUsers";   // 다른 게임 데이터와 섞이지 않도록 별도 컬렉션 사용
+let userName = "";
+let items = [];
+let uid = null;
+
+const $ = (id) => document.getElementById(id);
+
+/* ---------- 유틸 ---------- */
+function today() {
+  const d = new Date();
+  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+}
+function esc(s) {
+  return s.replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+function setMsg(text, ok) {
+  const el = $("loginMsg");
+  el.textContent = text;
+  el.className = "msg" + (ok ? " ok" : "");
+}
+function busy(b) {
+  $("loginBtn").disabled = b;
+  $("signupBtn").disabled = b;
+}
+
+/* 이름 → 가짜 이메일 (한글 이름도 사용 가능하도록 해시로 변환) */
+async function nameToEmail(name) {
+  const norm = name.trim().toLowerCase();
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode("todo::" + norm));
+  const hex = Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
+  return "u" + hex.slice(0, 32) + "@todo-student.app";
+}
+
+function authErrorText(code) {
+  switch (code) {
+    case "auth/weak-password": return "비밀번호는 6글자 이상으로 해 주세요.";
+    case "auth/email-already-in-use": return "이미 있는 이름이에요. '들어가기'를 누르거나 다른 이름을 써 주세요.";
+    case "auth/invalid-credential":
+    case "auth/wrong-password":
+    case "auth/user-not-found": return "이름 또는 비밀번호가 달라요. 처음이라면 '처음 시작하기'를 눌러요.";
+    case "auth/too-many-requests": return "너무 많이 시도했어요. 잠시 후 다시 해 주세요.";
+    case "auth/network-request-failed": return "인터넷 연결을 확인해 주세요.";
+    default: return "문제가 생겼어요. (" + code + ")";
+  }
+}
+
+/* ---------- 로그인 / 가입 ---------- */
+async function doAuth(isSignup) {
+  const name = $("nameInput").value.trim();
+  const pw = $("pwInput").value;
+  if (!name) return setMsg("이름을 입력해 주세요.");
+  if (!pw) return setMsg("비밀번호를 입력해 주세요.");
+  if (isSignup && pw.length < 6) return setMsg("비밀번호는 6글자 이상으로 해 주세요.");
+
+  busy(true);
+  setMsg("잠시만 기다려 주세요...", true);
+  try {
+    const email = await nameToEmail(name);
+    if (isSignup) {
+      const cred = await createUserWithEmailAndPassword(auth, email, pw);
+      await setDoc(doc(db, COLLECTION, cred.user.uid), { name: name, items: [], updatedAt: Date.now() });
+    } else {
+      await signInWithEmailAndPassword(auth, email, pw);
+    }
+    $("pwInput").value = "";
+    // 화면 전환은 onAuthStateChanged에서 처리
+  } catch (e) {
+    setMsg(authErrorText(e.code || e.message));
+  }
+  busy(false);
+}
+
+/* ---------- 데이터 저장 ---------- */
+async function save() {
+  const s = $("saveState");
+  try {
+    await setDoc(doc(db, COLLECTION, uid), { name: userName, items: items, updatedAt: Date.now() });
+    s.className = "saved";
+    s.textContent = "✔ 저장됨";
+    clearTimeout(save.t);
+    save.t = setTimeout(() => (s.textContent = ""), 1500);
+  } catch (e) {
+    s.className = "saved err";
+    s.textContent = "저장 실패! 인터넷을 확인해 주세요.";
+  }
+}
+
+/* ---------- 화면 ---------- */
+onAuthStateChanged(auth, async (user) => {
+  if (!user) {
+    uid = null; items = []; userName = "";
+    $("listView").classList.add("hidden");
+    $("loginView").classList.remove("hidden");
+    return;
+  }
+  uid = user.uid;
+  try {
+    const snap = await getDoc(doc(db, COLLECTION, uid));
+    const d = snap.exists() ? snap.data() : { name: "", items: [] };
+    userName = d.name || $("nameInput").value.trim() || "친구";
+    items = d.items || [];
+    if (!snap.exists()) await save();
+  } catch (e) {
+    setMsg("목록을 불러오지 못했어요. 인터넷을 확인해 주세요.");
+    return;
+  }
+  $("loginView").classList.add("hidden");
+  $("listView").classList.remove("hidden");
+  $("userName").textContent = userName;
+  setMsg("");
+  render();
+});
+
+function addItem() {
+  const input = $("newItem");
+  const text = input.value.trim();
+  if (!text) return;
+  items.push({
+    id: Date.now() + "-" + Math.random().toString(36).slice(2, 6),
+    text: text, done: false, date: "", parent: false
+  });
+  input.value = "";
+  save(); render();
+  input.focus();
+}
+
+function render() {
+  const box = $("items");
+  const doneCnt = items.filter(i => i.done).length;
+  const parentCnt = items.filter(i => i.parent).length;
+  $("sumTotal").textContent = "📋 전체 " + items.length + "개";
+  $("sumDone").textContent = "✅ 실천 " + doneCnt + "개";
+  $("sumParent").textContent = "👨‍👩‍👧 부모님 확인 " + parentCnt + "개";
+
+  if (!items.length) {
+    box.innerHTML = '<div class="empty">아직 목록이 없어요.<br>위에서 실천할 일을 추가해 보세요!</div>';
+    return;
+  }
+  box.innerHTML = items.map(it => `
+    <div class="item ${it.done ? "done" : ""}" data-id="${it.id}">
+      <div class="title">${esc(it.text)}</div>
+      <div class="controls">
+        <label class="chk">
+          <input type="checkbox" data-act="done" ${it.done ? "checked" : ""}> 실천했어요
+        </label>
+        <label class="chk parent ${it.done ? "" : "disabled"}">
+          <input type="checkbox" data-act="parent" ${it.parent ? "checked" : ""} ${it.done ? "" : "disabled"}> 부모님 확인함
+        </label>
+        <span class="spacer"></span>
+        <span class="datebox">📅 실천 날짜
+          <input type="date" data-act="date" value="${it.date}" ${it.done ? "" : "disabled"}>
+        </span>
+        <button class="del small" data-act="del">삭제</button>
+      </div>
+    </div>
+  `).join("");
+}
+
+function onItemsEvent(e) {
+  const el = e.target.closest("[data-act]");
+  if (!el) return;
+  const row = el.closest(".item");
+  const item = items.find(i => i.id === row.dataset.id);
+  if (!item) return;
+  const act = el.dataset.act;
+
+  if (act === "done" && e.type === "change") {
+    item.done = el.checked;
+    if (item.done) { item.date = item.date || today(); }
+    else { item.date = ""; item.parent = false; }
+    save(); render();
+  } else if (act === "parent" && e.type === "change") {
+    item.parent = el.checked;
+    save(); render();
+  } else if (act === "date" && e.type === "change") {
+    item.date = el.value;
+    save();
+  } else if (act === "del" && e.type === "click") {
+    if (confirm("이 항목을 지울까요?\n\n" + item.text)) {
+      items = items.filter(i => i.id !== item.id);
+      save(); render();
+    }
+  }
+}
+
+/* ---------- 이벤트 ---------- */
+$("loginBtn").addEventListener("click", () => doAuth(false));
+$("signupBtn").addEventListener("click", () => doAuth(true));
+$("pwInput").addEventListener("keydown", e => { if (e.key === "Enter") doAuth(false); });
+$("nameInput").addEventListener("keydown", e => { if (e.key === "Enter") $("pwInput").focus(); });
+$("logoutBtn").addEventListener("click", () => signOut(auth));
+$("addBtn").addEventListener("click", addItem);
+$("newItem").addEventListener("keydown", e => { if (e.key === "Enter") addItem(); });
+$("items").addEventListener("change", onItemsEvent);
+$("items").addEventListener("click", onItemsEvent);
+</script>
+</body>
+</html>
