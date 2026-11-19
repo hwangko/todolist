@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>선생님 현황판</title>
+<style>
+  :root { --bg:#eef3fb; --card:#fff; --main:#3b6fd8; --main-dark:#2c56b0; --green:#2f8a46; --red:#c0392b; --orange:#e08a00; --line:#dbe3f2; --text:#2f3542; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family:"Malgun Gothic","Apple SD Gothic Neo","Noto Sans KR",sans-serif; background:var(--bg); color:var(--text); }
+  .wrap { max-width: 900px; margin: 0 auto; padding: 20px 14px 60px; }
+  h1 { text-align:center; color:var(--main-dark); margin:8px 0 18px; font-size:1.7rem; }
+  .card { background:var(--card); border-radius:16px; padding:20px; box-shadow:0 3px 12px rgba(0,0,0,.08); margin-bottom:14px; }
+  label { display:block; font-weight:bold; margin:10px 0 6px; }
+  input[type=text], input[type=email], input[type=password] { width:100%; padding:11px 13px; font-size:1rem; border:2px solid var(--line); border-radius:10px; font-family:inherit; }
+  input:focus { outline:none; border-color:var(--main); }
+  button { font-family:inherit; font-size:1rem; border:none; border-radius:10px; padding:10px 16px; cursor:pointer; background:var(--main); color:#fff; font-weight:bold; }
+  button:hover { background:var(--main-dark); }
+  button:disabled { opacity:.5; cursor:wait; }
+  button.ghost { background:#e6e9ef; color:#555; }
+  button.ghost:hover { background:#d5d9e2; }
+  .full { width:100%; margin-top:16px; }
+  .msg { margin-top:12px; font-weight:bold; color:var(--red); text-align:center; min-height:1.2em; }
+  .msg.ok { color:var(--green); }
+  .topbar { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .topbar .grow { flex:1; min-width:160px; }
+  .summary { display:flex; gap:8px; flex-wrap:wrap; margin-top:12px; }
+  .pill { background:#e8eefc; border-radius:999px; padding:6px 14px; font-weight:bold; font-size:.92rem; }
+  .pill.warn { background:#fff0d6; color:var(--orange); }
+  details.student { background:var(--card); border-radius:14px; box-shadow:0 2px 8px rgba(0,0,0,.07); margin-bottom:10px; overflow:hidden; }
+  details.student > summary { list-style:none; cursor:pointer; padding:14px 16px; display:flex; flex-wrap:wrap; align-items:center; gap:8px 12px; }
+  details.student > summary::-webkit-details-marker { display:none; }
+  details.student > summary::before { content:"▶"; font-size:.8rem; color:#888; }
+  details.student[open] > summary::before { content:"▼"; }
+  .sname { font-size:1.12rem; font-weight:bold; min-width:90px; }
+  .stat { font-size:.9rem; font-weight:bold; background:#f1f4fa; padding:4px 10px; border-radius:999px; }
+  .stat.warn { background:#fff0d6; color:var(--orange); }
+  .stat.flag { background:#fde4e1; color:var(--red); }
+  .upd { margin-left:auto; font-size:.82rem; color:#888; }
+  table { width:100%; border-collapse:collapse; font-size:.93rem; }
+  th, td { padding:9px 10px; border-top:1px solid var(--line); text-align:left; vertical-align:top; }
+  th { background:#f6f8fd; font-size:.85rem; color:#667; }
+  .tbl { overflow-x:auto; }
+  .ok { color:var(--green); font-weight:bold; }
+  .no { color:#aaa; }
+  .tag { display:inline-block; font-size:.78rem; font-weight:bold; border-radius:999px; padding:2px 8px; margin-left:4px; }
+  .tag.late { background:#fff0d6; color:var(--orange); }
+  .tag.batch { background:#fde4e1; color:var(--red); }
+  .empty { text-align:center; color:#888; padding:30px 0; }
+  pre { background:#f4f6fb; border:1px solid var(--line); border-radius:10px; padding:12px; overflow-x:auto; font-size:.85rem; user-select:all; }
+  .hidden { display:none; }
+  .note { font-size:.85rem; color:#778; margin-top:6px; line-height:1.5; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>👩‍🏫 선생님 현황판</h1>
+
+  <!-- 로그인 -->
+  <section id="loginView" class="card">
+    <label for="emailInput">선생님 이메일</label>
+    <input id="emailInput" type="email" autocomplete="username" placeholder="Firebase에서 만든 선생님 계정">
+    <label for="pwInput">비밀번호</label>
+    <input id="pwInput" type="password" autocomplete="current-password">
+    <button id="loginBtn" class="full">로그인</button>
+    <div id="loginMsg" class="msg"></div>
+  </section>
+
+  <!-- 권한 안내 -->
+  <section id="ruleView" class="card hidden">
+    <h3 style="margin-top:0">🔑 읽기 권한 설정이 필요해요</h3>
+    <p>선생님 계정에 학생 목록을 읽을 권한이 아직 없습니다. 아래 순서대로 한 번만 설정해 주세요.</p>
+    <ol>
+      <li>Firebase 콘솔 → <b>Firestore Database → 규칙</b> 탭을 엽니다.</li>
+      <li>아래 내용으로 전체를 바꿔 붙여넣고 <b>게시</b>를 누릅니다. (선생님 UID가 이미 들어 있습니다.)</li>
+      <li>이 페이지에서 <b>다시 불러오기</b>를 누릅니다.</li>
+    </ol>
+    <pre id="ruleText"></pre>
+    <button id="retryBtn">다시 불러오기</button>
+    <button id="logout2" class="ghost">로그아웃</button>
+  </section>
+
+  <!-- 현황 -->
+  <section id="mainView" class="hidden">
+    <div class="card">
+      <div class="topbar">
+        <input id="filterInput" class="grow" type="text" placeholder="학생 이름 검색">
+        <button id="refreshBtn">새로고침</button>
+        <button id="logoutBtn" class="ghost">로그아웃</button>
+      </div>
+      <div class="summary" id="summary"></div>
+      <div class="note">
+        ⏰ <b>지연 확인</b>: 실천 날짜보다 2일 이상 뒤에 부모님 확인을 한 항목<br>
+        🚩 <b>몰아서 확인</b>: 10분 안에 3개 이상 부모님 확인을 한 항목
+      </div>
+    </div>
+    <div id="students"></div>
+  </section>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDoby2xaxwaZ-715IsxoGk3Hvdy9kXPc_0",
+  authDomain: "student-todo-5cb55.firebaseapp.com",
+  projectId: "student-todo-5cb55",
+  storageBucket: "student-todo-5cb55.firebasestorage.app",
+  messagingSenderId: "141424444209",
+  appId: "1:141424444209:web:5e3de088f806a40507e610"
+};
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const $ = (id) => document.getElementById(id);
+
+let students = [];   // 가공된 학생 데이터
+let teacherUid = "";
+
+/* ---------- 유틸 ---------- */
+const esc = (s) => String(s).replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+const KST = "Asia/Seoul";
+function fmtTime(ms) {
+  if (!ms) return "";
+  return new Date(ms).toLocaleString("ko-KR", { timeZone: KST, month:"numeric", day:"numeric", hour:"2-digit", minute:"2-digit", hour12:false });
+}
+function fmtFull(ms) {
+  if (!ms) return "";
+  return new Date(ms).toLocaleString("ko-KR", { timeZone: KST, year:"numeric", month:"numeric", day:"numeric", hour:"2-digit", minute:"2-digit", hour12:false });
+}
+function kstDate(ms) {
+  return new Date(ms).toLocaleDateString("en-CA", { timeZone: KST }); // YYYY-MM-DD
+}
+function dayDiff(a, b) { // b - a (일)
+  return Math.round((Date.parse(b) - Date.parse(a)) / 86400000);
+}
+function setMsg(t, ok) { const el = $("loginMsg"); el.textContent = t; el.className = "msg" + (ok ? " ok" : ""); }
+function show(view) {
+  ["loginView","ruleView","mainView"].forEach(v => $(v).classList.toggle("hidden", v !== view));
+}
+
+/* ---------- 로그인 ---------- */
+async function login() {
+  const email = $("emailInput").value.trim();
+  const pw = $("pwInput").value;
+  if (!email || !pw) return setMsg("이메일과 비밀번호를 입력해 주세요.");
+  $("loginBtn").disabled = true;
+  setMsg("로그인 중...", true);
+  try {
+    await signInWithEmailAndPassword(auth, email, pw);
+    $("pwInput").value = "";
+  } catch (e) {
+    const c = e.code || "";
+    if (c.includes("invalid") || c.includes("wrong") || c.includes("user-not-found")) setMsg("이메일 또는 비밀번호가 달라요.");
+    else if (c.includes("network")) setMsg("인터넷 연결을 확인해 주세요.");
+    else setMsg("로그인 실패 (" + c + ")");
+  }
+  $("loginBtn").disabled = false;
+}
+
+/* ---------- 데이터 불러오기 ---------- */
+async function load() {
+  $("refreshBtn").disabled = true;
+  try {
+    const snap = await getDocs(collection(db, "todoUsers"));
+    students = [];
+    snap.forEach(d => {
+      const v = d.data();
+      const items = Array.isArray(v.items) ? v.items.slice() : [];
+      // 몰아서 확인 감지: 10분(600,000ms) 안에 3개 이상
+      const stamps = items.filter(i => i.parent && i.parentAt).map(i => i.parentAt).sort((a, b) => a - b);
+      const batchSet = new Set();
+      for (let i = 0; i < stamps.length; i++) {
+        let j = i;
+        while (j + 1 < stamps.length && stamps[j + 1] - stamps[i] <= 600000) j++;
+        if (j - i + 1 >= 3) for (let k = i; k <= j; k++) batchSet.add(stamps[k]);
+      }
+      items.forEach(i => {
+        i._batch = !!(i.parent && i.parentAt && batchSet.has(i.parentAt));
+        i._late = 0;
+        if (i.parent && i.parentAt && i.date) {
+          const diff = dayDiff(i.date, kstDate(i.parentAt));
+          if (diff >= 2) i._late = diff;
+        }
+      });
+      students.push({
+        id: d.id,
+        name: v.name || "(이름 없음)",
+        items: items,
+        updatedAt: v.updatedAt || 0
+      });
+    });
+    students.sort((a, b) => a.name.localeCompare(b.name, "ko"));
+    show("mainView");
+    render();
+  } catch (e) {
+    if (e.code === "permission-denied") {
+      $("ruleText").textContent =
+`rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /todoUsers/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+      allow read: if request.auth != null && request.auth.uid == '${teacherUid}';
+    }
+  }
+}`;
+      show("ruleView");
+    } else {
+      show("mainView");
+      $("students").innerHTML = '<div class="empty">불러오지 못했어요. 인터넷을 확인하고 새로고침해 주세요.<br>(' + esc(e.code || e.message) + ')</div>';
+    }
+  }
+  $("refreshBtn").disabled = false;
+}
+
+/* ---------- 화면 ---------- */
+function render() {
+  const q = $("filterInput").value.trim().toLowerCase();
+  const list = students.filter(s => !q || s.name.toLowerCase().includes(q));
+
+  const totalItems = students.reduce((n, s) => n + s.items.length, 0);
+  const totalDone = students.reduce((n, s) => n + s.items.filter(i => i.done).length, 0);
+  const totalParent = students.reduce((n, s) => n + s.items.filter(i => i.parent).length, 0);
+  const waiting = students.reduce((n, s) => n + s.items.filter(i => i.done && !i.parent).length, 0);
+  const flagged = students.reduce((n, s) => n + s.items.filter(i => i._batch || i._late).length, 0);
+  $("summary").innerHTML =
+    '<span class="pill">👥 학생 ' + students.length + '명</span>' +
+    '<span class="pill">✅ 실천 ' + totalDone + '/' + totalItems + '</span>' +
+    '<span class="pill">👨‍👩‍👧 부모님 확인 ' + totalParent + '</span>' +
+    '<span class="pill warn">⌛ 확인 대기 ' + waiting + '</span>' +
+    '<span class="pill warn">🚩 살펴볼 항목 ' + flagged + '</span>';
+
+  if (!list.length) {
+    $("students").innerHTML = '<div class="empty">표시할 학생이 없어요.</div>';
+    return;
+  }
+
+  $("students").innerHTML = list.map(s => {
+    const done = s.items.filter(i => i.done).length;
+    const parent = s.items.filter(i => i.parent).length;
+    const wait = s.items.filter(i => i.done && !i.parent).length;
+    const flags = s.items.filter(i => i._batch || i._late).length;
+    const rows = s.items.length ? s.items.map(i => `
+      <tr>
+        <td>${esc(i.text)}</td>
+        <td>${i.done ? '<span class="ok">✔ ' + esc(i.date || "") + '</span>' : '<span class="no">아직</span>'}</td>
+        <td>${i.parent
+            ? '<span class="ok">✔ ' + (i.parentAt ? esc(fmtFull(i.parentAt)) : "시간 기록 없음") + '</span>'
+              + (i._late ? '<span class="tag late">⏰ ' + i._late + '일 뒤</span>' : '')
+              + (i._batch ? '<span class="tag batch">🚩 몰아서</span>' : '')
+            : '<span class="no">' + (i.done ? "대기 중" : "-") + '</span>'}</td>
+      </tr>`).join("") : '<tr><td colspan="3" class="no">등록한 목록이 없어요.</td></tr>';
+    return `
+    <details class="student">
+      <summary>
+        <span class="sname">${esc(s.name)}</span>
+        <span class="stat">전체 ${s.items.length}</span>
+        <span class="stat">실천 ${done}</span>
+        <span class="stat">부모님 확인 ${parent}</span>
+        ${wait ? '<span class="stat warn">대기 ' + wait + '</span>' : ""}
+        ${flags ? '<span class="stat flag">🚩 ' + flags + '</span>' : ""}
+        <span class="upd">${s.updatedAt ? "최근 " + esc(fmtTime(s.updatedAt)) : ""}</span>
+      </summary>
+      <div class="tbl">
+        <table>
+          <thead><tr><th>할 일</th><th>실천 날짜</th><th>부모님 확인 시간</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </details>`;
+  }).join("");
+}
+
+/* ---------- 이벤트 ---------- */
+onAuthStateChanged(auth, (user) => {
+  if (!user) { teacherUid = ""; students = []; show("loginView"); return; }
+  teacherUid = user.uid;
+  load();
+});
+$("loginBtn").addEventListener("click", login);
+$("pwInput").addEventListener("keydown", e => { if (e.key === "Enter") login(); });
+$("refreshBtn").addEventListener("click", load);
+$("retryBtn").addEventListener("click", load);
+$("logoutBtn").addEventListener("click", () => signOut(auth));
+$("logout2").addEventListener("click", () => signOut(auth));
+$("filterInput").addEventListener("input", render);
+</script>
+</body>
+</html>
